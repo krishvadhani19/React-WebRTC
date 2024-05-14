@@ -1,0 +1,6 @@
+# lock files
+client/**/*.lock
+server/**/*.lock
+
+# 
+node_modules/
