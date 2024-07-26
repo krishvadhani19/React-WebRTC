@@ -1,7 +1,17 @@
-import "./App.css";
+import { lazy } from "react";
+import { BrowserRouter, Routes, Route } from "react-router-dom";
+import "@/styles/index.scss";
+
+const LobbyPage = lazy(() => import("@/pages/LobbyPage/LobbyPage"));
 
 function App() {
-  return <div>Hello</div>;
+  return (
+    <BrowserRouter>
+      <Routes>
+        <Route path="/lobby" element={<LobbyPage />} />
+      </Routes>
+    </BrowserRouter>
+  );
 }
 
 export default App;
