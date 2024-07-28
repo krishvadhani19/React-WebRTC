@@ -1,5 +1,6 @@
-import { FormEvent, useCallback, useState } from "react";
+import { FormEvent, useCallback, useContext, useEffect, useState } from "react";
 import "./LobbyPage.scss";
+import { SocketContext } from "@/contexts/SocketContext";
 
 const LobbyPage = () => {
   const [formData, setFormData] = useState({ email: "", roomCode: "" });
@@ -8,9 +9,33 @@ const LobbyPage = () => {
     setFormData((prev) => ({ ...prev, [field]: val }));
   }, []);
 
-  const handleFormSubmit = useCallback((e: FormEvent) => {
-    e.preventDefault();
-  }, []);
+  const { socket } = useContext(SocketContext);
+
+  const handleFormSubmit = useCallback(
+    (e: FormEvent) => {
+      e.preventDefault();
+
+      socket.emit("room:join", formData);
+    },
+    [formData, socket]
+  );
+
+  const handleJoinRoom = useCallback(
+    (data: { email: string; roomCode: string }) => {
+      const { email, roomCode } = data;
+
+      console.log({ email, roomCode });
+    },
+    []
+  );
+
+  useEffect(() => {
+    socket.on("room:join", handleJoinRoom);
+
+    return () => {
+      socket.off("room:join", handleJoinRoom);
+    };
+  }, [handleJoinRoom]);
 
   return (
     <div className="lobby-page-container">
