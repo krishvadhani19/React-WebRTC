@@ -11,7 +11,7 @@ const App = function App() {
       <Routes>
         <Route path="/lobby" element={<LobbyPage />} />
 
-        <Route path="/room" element={<RoomPage />} />
+        <Route path="/room/:roomId" element={<RoomPage />} />
       </Routes>
     </BrowserRouter>
   );

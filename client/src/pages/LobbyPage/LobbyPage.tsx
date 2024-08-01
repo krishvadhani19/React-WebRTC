@@ -1,9 +1,11 @@
 import { FormEvent, useCallback, useContext, useEffect, useState } from "react";
 import "./LobbyPage.scss";
 import { SocketContext } from "@/contexts/SocketContext";
+import { useNavigate } from "react-router-dom";
 
 const LobbyPage = () => {
   const [formData, setFormData] = useState({ email: "", roomCode: "" });
+  const navigate = useNavigate();
 
   const handleFormChange = useCallback((val: string, field: string) => {
     setFormData((prev) => ({ ...prev, [field]: val }));
@@ -23,6 +25,8 @@ const LobbyPage = () => {
   const handleJoinRoom = useCallback(
     (data: { email: string; roomCode: string }) => {
       const { email, roomCode } = data;
+
+      navigate(`/room/${roomCode}`);
 
       console.log({ email, roomCode });
     },

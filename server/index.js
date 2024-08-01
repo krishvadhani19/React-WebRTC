@@ -17,6 +17,12 @@ io.on("connection", (socket) => {
     emailToSocketIdMap.set(email, socket.id);
     socketIdToEmailMap.set(socket.id, email);
 
+    // all users having this roomCode will be notified
+    io.to(roomCode).emit("user:joined", { email, id: socket.id });
+
+    // join this socket connection
+    socket.join(roomCode);
+
     // join room and return data
     io.to(socket.id).emit("room:join", data);
   });
