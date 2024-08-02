@@ -1,6 +1,12 @@
 const { Server } = require("socket.io");
+const express = require("express");
+const http = require("http");
 
-const io = new Server(8000, {
+const app = express();
+
+const server = http.createServer();
+
+const io = new Server(server, {
   cors: {
     origin: "http://localhost:5173",
     methods: ["GET", "POST"],
@@ -11,19 +17,39 @@ const emailToSocketIdMap = new Map();
 const socketIdToEmailMap = new Map();
 
 io.on("connection", (socket) => {
+  console.log("A user connected");
+
   socket.on("room:join", (data) => {
     const { email, roomCode } = data;
 
-    emailToSocketIdMap.set(email, socket.id);
-    socketIdToEmailMap.set(socket.id, email);
-
-    // all users having this roomCode will be notified
-    io.to(roomCode).emit("user:joined", { email, id: socket.id });
-
-    // join this socket connection
+    // new user is joining the room
     socket.join(roomCode);
 
-    // join room and return data
+    // using socket.to and not io.to as socket.to will send message to everyone on this roomCode and not the current socket user
+    socket.to(roomCode).emit("user:joined", { email, id: socket.id });
+
+    // when user disconnects this will notify to all except the current socket user
+    // socket.on("disconnect", () => {
+    //   socket.to(roomId).emit("user-disconnected", { id: socket.id });
+    // });
+
+    // sending message to all having this socket Id
     io.to(socket.id).emit("room:join", data);
+    // this also means the same of emitting to all having this socket but the socket is unique to the new joined user
+    // socket.emit("room:join", data);
+
+    /**
+     * socket event for placing call from a peer
+     * The peer is sending an offer which
+     */
+    socket.on("user:call", ({ to, offer }) => {
+      io.to(to).emit("incoming-call", { from: socket.id, offer });
+    });
   });
+});
+
+const PORT = 8000;
+
+server.listen(PORT, () => {
+  console.log(`Server is running on port ${PORT}`);
 });
