@@ -40,10 +40,19 @@ io.on("connection", (socket) => {
 
     /**
      * socket event for placing call from a peer
-     * The peer is sending an offer which
+     * The peer is sending an offer to all the users of with the particular roomCode
+     * This incoming-call event is triggered to all users except the one sending in that room
      */
     socket.on("user:call", ({ to, offer }) => {
-      io.to(to).emit("incoming-call", { from: socket.id, offer });
+      io.to(to).emit("incoming:call", { from: socket.id, offer });
+    });
+
+    /**
+     * socket event to accept call
+     */
+
+    socket.on("call:accepted", ({ callerId, ans }) => {
+      io.to(callerId).emit("call:accepted", { from: socket.id, ans });
     });
   });
 });

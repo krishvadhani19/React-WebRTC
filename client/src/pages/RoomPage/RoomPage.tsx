@@ -2,12 +2,13 @@ import { useCallback, useContext, useEffect, useState } from "react";
 import "./RoomPage.scss";
 import { SocketContext } from "@/contexts/SocketContext";
 import ReactPlayer from "react-player";
-import peer from "@/service/peer";
+import peerInstance from "@/service/peer";
 
 const RoomPage = () => {
   const { socket } = useContext(SocketContext);
   const [remoteSocketId, setRemoteSocketId] = useState<string | null>(null);
   const [myStream, setMyStream] = useState<MediaStream>();
+  const [remoteStreams, setRemoteStreams] = useState<MediaStream[]>([]);
 
   const handleUserJoined = useCallback(
     (data: { email: string; id: string }) => {
@@ -18,34 +19,76 @@ const RoomPage = () => {
   );
 
   const handleCallUser = useCallback(async () => {
+    console.log(`Calling user ${remoteSocketId}`);
+
+    // get offer
+    const offer = await peerInstance.getOffer();
+
+    // emit user call event
+    socket.emit("user:call", { to: remoteSocketId, offer });
+
+    // create stream and set current state
     const stream = await navigator.mediaDevices.getUserMedia({
       audio: true,
       video: true,
     });
-
-    const offer = await peer.getOffer();
-
-    socket.emit("user:call", { to: remoteSocketId, offer });
-
     setMyStream(stream);
   }, [remoteSocketId, socket]);
 
   const handleIncomingCall = useCallback(
-    (data: { from: string; offer: RTCSessionDescriptionInit }) => {
-      console.log({ data });
+    async (data: { from: string; offer: RTCSessionDescriptionInit }) => {
+      const stream = await navigator.mediaDevices.getUserMedia({
+        audio: true,
+        video: true,
+      });
+
+      console.log("Incoming call", data);
+
+      setMyStream(stream);
+
+      setRemoteSocketId(data?.from);
+
+      const ans = await peerInstance.getAnswer(data?.offer);
+      console.log({ ans });
+
+      socket.emit("call:accepted", { callerId: data?.from, ans });
     },
     [remoteSocketId]
+  );
+
+  const handleCallAccepted = useCallback(
+    async (data: { from: string; ans: RTCSessionDescriptionInit }) => {
+      console.log("Call Accepted");
+
+      const { from, ans } = data;
+
+      await peerInstance.setRemoteDescription(ans);
+
+      for (const track of myStream?.getTracks()!) {
+        peerInstance.peer?.addTrack(track, myStream!);
+      }
+    },
+    [myStream]
   );
 
   useEffect(() => {
     socket.on("user:joined", handleUserJoined);
     socket.on("incoming:call", handleIncomingCall);
+    socket.on("call:accepted", handleCallAccepted);
 
     return () => {
       socket.off("user:joined", handleUserJoined);
       socket.off("incoming:call", handleIncomingCall);
+      socket.off("call:accepted", handleCallAccepted);
     };
-  }, [socket, handleUserJoined]);
+  }, [socket, handleUserJoined, handleIncomingCall, handleCallAccepted]);
+
+  useEffect(() => {
+    peerInstance.peer?.addEventListener("track", (e: any) => {
+      console.log({ streams: e?.streams });
+      setRemoteStreams(e?.streams);
+    });
+  }, []);
 
   return (
     <div>
@@ -56,13 +99,38 @@ const RoomPage = () => {
       {remoteSocketId && <button onClick={handleCallUser}>Call</button>}
 
       {myStream && (
-        <ReactPlayer
-          playing
-          muted
-          width="400px"
-          height="200px"
-          url={myStream}
-        />
+        <div className="flex-center">
+          <h1>My Stream</h1>
+
+          <ReactPlayer
+            playing
+            muted
+            width="400px"
+            height="200px"
+            url={myStream}
+          />
+        </div>
+      )}
+
+      {!!remoteStreams.length && (
+        <div className="flex-center">
+          <h1>Remote Streams</h1>
+
+          <div className="flex-center flex-column gap-1">
+            {remoteStreams.map((streamItem, key) => {
+              return (
+                <ReactPlayer
+                  playing
+                  muted
+                  width="400px"
+                  height="200px"
+                  url={streamItem}
+                  key={key}
+                />
+              );
+            })}
+          </div>
+        </div>
       )}
     </div>
   );
