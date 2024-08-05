@@ -56,19 +56,43 @@ const RoomPage = () => {
     [remoteSocketId]
   );
 
+  const handleSendStream = useCallback(() => {
+    for (const track of myStream?.getTracks()!) {
+      peerInstance.peer?.addTrack(track, myStream!);
+    }
+  }, [myStream]);
+
   const handleCallAccepted = useCallback(
     async (data: { from: string; ans: RTCSessionDescriptionInit }) => {
       console.log("Call Accepted");
 
-      const { from, ans } = data;
+      const { ans } = data;
 
       await peerInstance.setRemoteDescription(ans);
 
-      for (const track of myStream?.getTracks()!) {
-        peerInstance.peer?.addTrack(track, myStream!);
-      }
+      handleSendStream();
     },
-    [myStream]
+    [handleSendStream]
+  );
+
+  const handleIncomingNegotiation = useCallback(
+    async (data: { from: string; offer: RTCSessionDescriptionInit }) => {
+      const ans = await peerInstance.getAnswer(data?.offer);
+      console.log("incoming nego", ans);
+
+      socket.emit("peer:nego:done", { to: data?.from, ans });
+    },
+    []
+  );
+
+  const handleFinalNegotiation = useCallback(
+    async (data: { from: string; ans: RTCSessionDescriptionInit }) => {
+      const { ans } = data;
+      console.log("finalNego", ans);
+
+      await peerInstance.setRemoteDescription(ans);
+    },
+    []
   );
 
   useEffect(() => {
@@ -76,14 +100,29 @@ const RoomPage = () => {
     socket.on("incoming:call", handleIncomingCall);
     socket.on("call:accepted", handleCallAccepted);
 
+    // this socket event is used to handle incoming negotiation socket event
+    socket.on("peer:nego:needed", handleIncomingNegotiation);
+
+    socket.on("peer:nego:final", handleFinalNegotiation);
+
     return () => {
       socket.off("user:joined", handleUserJoined);
       socket.off("incoming:call", handleIncomingCall);
       socket.off("call:accepted", handleCallAccepted);
+      socket.off("peer:nego:needed", handleIncomingNegotiation);
+      socket.off("peer:nego:final", handleFinalNegotiation);
     };
-  }, [socket, handleUserJoined, handleIncomingCall, handleCallAccepted]);
+  }, [
+    socket,
+    handleUserJoined,
+    handleIncomingCall,
+    handleCallAccepted,
+    handleIncomingNegotiation,
+    handleFinalNegotiation,
+  ]);
 
   const handleTrack = useCallback((e: RTCTrackEvent) => {
+    console.log({ streams: e?.streams });
     setRemoteStreams([...e?.streams]);
   }, []);
 
@@ -94,9 +133,11 @@ const RoomPage = () => {
     return () => {
       peerInstance.peer?.removeEventListener("track", handleTrack);
     };
-  }, []);
+  }, [peerInstance.peer, handleTrack]);
 
+  // event when LOCAL PEER makes audio and video changes, new offer is created and socket event is added
   const handleNegotiationNeeded = useCallback(async () => {
+    console.log("handleNegoNeeded");
     const offer = await peerInstance.getOffer();
 
     socket.emit("peer:nego:needed", { offer, to: remoteSocketId });
@@ -122,7 +163,7 @@ const RoomPage = () => {
         handleNegotiationNeeded
       );
     };
-  }, []);
+  }, [peerInstance.peer, handleNegotiationNeeded]);
 
   return (
     <div>
@@ -131,6 +172,7 @@ const RoomPage = () => {
       <div>{remoteSocketId ? "Connected" : "Disconnected"}</div>
 
       {remoteSocketId && <button onClick={handleCallUser}>Call</button>}
+      {myStream && <button onClick={handleSendStream}>Send Stream</button>}
 
       {myStream && (
         <div className="flex-center">

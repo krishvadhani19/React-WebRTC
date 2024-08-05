@@ -50,9 +50,22 @@ io.on("connection", (socket) => {
     /**
      * socket event to accept call
      */
-
     socket.on("call:accepted", ({ callerId, ans }) => {
       io.to(callerId).emit("call:accepted", { from: socket.id, ans });
+    });
+
+    /**
+     *
+     */
+    socket.on("peer:nego:needed", ({ offer, to }) => {
+      io.to(to).emit("peer:nego:needed", { from: socket.id, offer });
+    });
+
+    /**
+     *
+     */
+    socket.on("peer:nego:done", ({ to, ans }) => {
+      io.to(to).emit("peer:nego:final", { from: socket.id, ans });
     });
   });
 });
