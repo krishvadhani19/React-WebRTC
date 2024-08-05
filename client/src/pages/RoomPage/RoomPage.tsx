@@ -53,7 +53,7 @@ const RoomPage = () => {
 
       socket.emit("call:accepted", { callerId: data?.from, ans });
     },
-    [remoteSocketId]
+    [remoteSocketId, socket]
   );
 
   const handleSendStream = useCallback(() => {
@@ -96,13 +96,39 @@ const RoomPage = () => {
   );
 
   useEffect(() => {
+    /**
+     * Set remote socket Id state var
+     */
     socket.on("user:joined", handleUserJoined);
+
+    /**
+     * 1. Loaded my LOCAL stream
+     * 2. Set the stream to state var
+     * 3. Get answer to the offer
+     * 4. Send answer to socket
+     */
     socket.on("incoming:call", handleIncomingCall);
+
+    /**
+     * this socket event is used as acknowledgement that REMOTE user has accepted the call that was made
+     * Here, setting ans in my remote description
+     * Updating my tracks my stream
+     * this triggers negotiation since my peer got updated
+     * Now,
+     */
     socket.on("call:accepted", handleCallAccepted);
 
-    // this socket event is used to handle incoming negotiation socket event
+    //
+    /**
+     * this socket event is used to handle incoming negotiation socket event from REMOTE
+     * Here, we fetch answer for negotiation and send socket message of ans
+     */
     socket.on("peer:nego:needed", handleIncomingNegotiation);
 
+    /**
+     * this socket event is used as acknowledgement to negotiation sent by LOCAL and received from remote
+     * and hence, setting ans in my remote description
+     */
     socket.on("peer:nego:final", handleFinalNegotiation);
 
     return () => {
@@ -189,7 +215,7 @@ const RoomPage = () => {
       )}
 
       {!!remoteStreams.length && (
-        <div className="flex-center">
+        <div className="flex-center" key={remoteStreams.length}>
           <h1>Remote Streams</h1>
 
           <div className="flex-center flex-column gap-1">
