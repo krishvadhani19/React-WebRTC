@@ -10,14 +10,6 @@ const RoomPage = () => {
   const [myStream, setMyStream] = useState<MediaStream>();
   const [remoteStreams, setRemoteStreams] = useState<MediaStream[]>([]);
 
-  const handleUserJoined = useCallback(
-    (data: { email: string; id: string }) => {
-      console.log({ data });
-      setRemoteSocketId(data?.id);
-    },
-    []
-  );
-
   const handleCallUser = useCallback(async () => {
     console.log(`Calling user ${remoteSocketId}`);
 
@@ -34,6 +26,14 @@ const RoomPage = () => {
     });
     setMyStream(stream);
   }, [remoteSocketId, socket]);
+
+  const handleUserJoined = useCallback(
+    (data: { email: string; id: string }) => {
+      console.log({ data });
+      setRemoteSocketId(data?.id);
+    },
+    []
+  );
 
   const handleIncomingCall = useCallback(
     async (data: { from: string; offer: RTCSessionDescriptionInit }) => {
@@ -83,11 +83,45 @@ const RoomPage = () => {
     };
   }, [socket, handleUserJoined, handleIncomingCall, handleCallAccepted]);
 
+  const handleTrack = useCallback((e: RTCTrackEvent) => {
+    setRemoteStreams([...e?.streams]);
+  }, []);
+
+  // this event is fired when a REMOTE peer adds new audio or video to the connection
   useEffect(() => {
-    peerInstance.peer?.addEventListener("track", (e: any) => {
-      console.log({ streams: e?.streams });
-      setRemoteStreams(e?.streams);
-    });
+    peerInstance.peer?.addEventListener("track", handleTrack);
+
+    return () => {
+      peerInstance.peer?.removeEventListener("track", handleTrack);
+    };
+  }, []);
+
+  const handleNegotiationNeeded = useCallback(async () => {
+    const offer = await peerInstance.getOffer();
+
+    socket.emit("peer:nego:needed", { offer, to: remoteSocketId });
+  }, [socket, remoteSocketId]);
+
+  /**
+   * this event is fired when the LOCAL PEER(MYSELF) make changes to stream:
+   * Turn off/onn video or audio
+   * Improve video resolution
+   * Modifying audio settings
+   *
+   * When triggered, it typically starts a new offer/answer exchange to update the connection parameters.
+   */
+  useEffect(() => {
+    peerInstance.peer?.addEventListener(
+      "negotiationneeded",
+      handleNegotiationNeeded
+    );
+
+    return () => {
+      peerInstance.peer?.removeEventListener(
+        "negotiationneeded",
+        handleNegotiationNeeded
+      );
+    };
   }, []);
 
   return (
