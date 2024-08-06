@@ -13,9 +13,6 @@ const io = new Server(server, {
   },
 });
 
-const emailToSocketIdMap = new Map();
-const socketIdToEmailMap = new Map();
-
 io.on("connection", (socket) => {
   console.log("A user connected");
 
@@ -55,14 +52,16 @@ io.on("connection", (socket) => {
     });
 
     /**
-     *
+     * This socket event is triggered when Negotiation is fired from one of the PEERS
+     * Negotiation happens if there are new tracks added to the stream like audio, video
      */
     socket.on("peer:nego:needed", ({ offer, to }) => {
       io.to(to).emit("peer:nego:needed", { from: socket.id, offer });
     });
 
     /**
-     *
+     * This socket event is triggered when Negotiation is done
+     * Done: When a PEER accepts the call and sends final acknowledgement to the sender of acceptance or rejection
      */
     socket.on("peer:nego:done", ({ to, ans }) => {
       io.to(to).emit("peer:nego:final", { from: socket.id, ans });
